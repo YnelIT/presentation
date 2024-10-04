@@ -1,25 +1,58 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <pthread.h>
 
-void* wehe(void* jobag) {
-    printf("Thread is running. Argument passed: %d\n", *((int*)jobag));
+// Thread function
+void *thread_function(void *arg) {
+    int thread_id = *((int *)arg);
+    printf("Thread %d: I'm running in process %d\n", thread_id, getpid());
     return NULL;
 }
 
+// Function to create multiple threads in a process
+void create_threads(int num_threads) {
+    pthread_t threads[num_threads];
+    int thread_ids[num_threads];
+
+    for (int i = 0; i < num_threads; i++) {
+        thread_ids[i] = i + 1;
+        if (pthread_create(&threads[i], NULL, thread_function, &thread_ids[i]) != 0) {
+            perror("Failed to create thread");
+        }
+    }
+
+    // Join threads
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+
 int main() {
-    pthread_t thread;   
-    int ilan = 10;       
+    int num_processes = 2;
+    int num_threads_per_process = 3;
 
-    if (pthread_create(&thread, NULL, wehe, (void*)&ilan)) {
-        fprintf(stderr, "Error creating thread\n");
-        return 1;
+    for (int i = 0; i < num_processes; i++) {
+        pid_t pid = fork();
+
+        if (pid == 0) { // Child process
+            printf("Process %d created by parent %d\n", getpid(), getppid());
+            create_threads(num_threads_per_process);
+            exit(0); // Exit the child process
+        } else if (pid > 0) { // Parent process
+            // Continue to the next iteration to fork another child
+        } else {
+            perror("Failed to fork process");
+            exit(1);
+        }
     }
 
-    if (pthread_join(thread, NULL)) {
-        fprintf(stderr, "Error joining thread\n");
-        return 2;
+    // Wait for all child processes to finish
+    for (int i = 0; i < num_processes; i++) {
+        wait(NULL);
     }
 
-    printf("Process is finished\n");
+    printf("All processes and threads have finished execution.\n");
+
     return 0;
 }
